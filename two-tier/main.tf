@@ -20,10 +20,17 @@ resource "aws_route" "internet_access" {
   gateway_id             = aws_internet_gateway.default.id
 }
 
-# Create a subnet to launch our instances into
-resource "aws_subnet" "default" {
+# Create a subnet for our ELB
+resource "aws_subnet" "elb" {
   vpc_id                  = aws_vpc.default.id
-  cidr_block              = "10.0.1.0/24"
+  cidr_block              = "10.0.2.0/24"
+  map_public_ip_on_launch = true
+}
+
+# And a subnet for the instance(s)
+resource "aws_subnet" "instance" {
+  vpc_id                  = aws_vpc.default.id
+  cidr_block              = "10.0.3.0/24"
   map_public_ip_on_launch = true
 }
 
@@ -85,7 +92,7 @@ resource "aws_security_group" "default" {
 resource "aws_elb" "web" {
   name = "terraform-example-elb"
 
-  subnets         = [aws_subnet.default.id]
+  subnets         = [aws_subnet.elb.id]
   security_groups = [aws_security_group.elb.id]
   instances       = [aws_instance.web.id]
 
@@ -127,7 +134,7 @@ resource "aws_instance" "web" {
   # We're going to launch into the same subnet as our ELB. In a production
   # environment it's more common to have a separate private subnet for
   # backend instances.
-  subnet_id = aws_subnet.default.id
+  subnet_id = aws_subnet.instance.id
 
   # We run a remote provisioner on the instance after creating it.
   # In this case, we just install nginx and start it. By default,
