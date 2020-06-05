@@ -6,6 +6,7 @@ provider "aws" {
 # Create a VPC to launch our instances into
 resource "aws_vpc" "default" {
   cidr_block = "10.0.0.0/16"
+  enable_dns_hostnames = true
 }
 
 # Create an internet gateway to give our subnet access to the outside world
@@ -53,6 +54,14 @@ resource "aws_security_group" "elb" {
     to_port = 443
     protocol = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  #specific route from the ELB to subnets within the VPC
+  egress {
+    from_port = 80
+    to_port =  80
+    protocol = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]
   }
 
   # outbound internet access
@@ -122,6 +131,15 @@ resource "aws_elb" "web" {
     lb_protocol = "https"
     ssl_certificate_id = data.aws_acm_certificate.mycert.arn
   }
+
+  health_check {
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 3
+    target              = "HTTP:80/"
+    interval            = 5
+  }
+
 }
 
 resource "aws_key_pair" "auth" {
@@ -156,14 +174,5 @@ resource "aws_instance" "web" {
   # backend instances.
   subnet_id = aws_subnet.instance.id
 
-  # We run a remote provisioner on the instance after creating it.
-  # In this case, we just install nginx and start it. By default,
-  # this should be on port 80
-  provisioner "remote-exec" {
-    inline = [
-      "sudo apt-get -y update",
-      "sudo apt-get -y install nginx",
-      "sudo service nginx start",
-    ]
-  }
+  user_data  =  file("cloud_config.yaml")
 }
